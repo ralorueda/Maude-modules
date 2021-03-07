@@ -1,0 +1,41 @@
+fmod PFUN is
+    protecting NAT .
+    sorts Pair Magma PFun Rel Nat? .
+    subsorts Pair < Magma .
+    subsorts PFun < Rel .
+    subsort Nat < Nat? .
+    op undef : -> Nat? [ctor] .
+
+    vars I J K : Nat .
+    var M : Magma .
+    var MAux : Magma .
+    var F : PFun .
+    var R : Rel .
+
+    op [_,_] : Nat Nat -> Pair [ctor] .
+    op null : -> Magma [ctor] .         *** empty magma
+    op _,_ : Magma Magma -> Magma [ctor assoc comm id: null] .
+    op {_} : Magma -> Rel [ctor] .
+    eq [I,K], [I,K] = [I,K] .           *** idempotency
+    mb {null} : PFun .
+    cmb {[I, K], M} : PFun if def(I, {M}) = false /\ {M} : PFun .
+
+    op def : Nat Rel -> Bool .          *** is key defined in relation?
+    eq def(I, {null}) = false .
+    eq def(I, {[J, K], M}) = if I == J then true else def(I, {M}) fi .
+
+    op _[_] : PFun Nat -> Nat? .        *** partial function application
+    eq {null}[K] = undef .
+    ceq {[I, K], M}[J] = if I == J then K else {M}[J] fi if {[I, K], M} : PFun .
+
+    op update : Pair Rel -> Rel .
+    eq update([I, K], {[I, J], M}) = {[I, K], M} .
+    eq update([I, K], {M}) = {M} [owise] . 
+    
+    op _u_ : Rel Rel -> Rel [assoc comm] .
+    eq {M} u {MAux} = {M, MAux} .
+
+    op _n_ : Rel Rel -> Rel [assoc comm] .
+    eq {[I,K], M} n {[I,K], MAux} = {[I,K]} u ({M} n {MAux}) .
+    eq {M} n {MAux} = {null} [owise] .
+endfm

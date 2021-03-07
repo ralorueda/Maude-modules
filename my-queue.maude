@@ -1,0 +1,25 @@
+fmod MY-QUEUE is
+    including NAT .
+
+    sorts NeQueue{Nat} Queue{Nat} .
+    subsort Nat < NeQueue{Nat} < Queue{Nat} .
+
+    op nil : -> Queue{Nat} [ctor] .
+    op _:_ : Queue{Nat} Queue{Nat} -> Queue{Nat} [ctor assoc id: nil] .
+    op enqueue : Nat Queue{Nat} -> NeQueue{Nat} .
+    op dequeue : NeQueue{Nat} -> Queue{Nat} .
+    op firstFrom : NeQueue{Nat} -> Nat .
+    op lastFrom : NeQueue{Nat} -> Nat .
+    op lenght : Queue{Nat} -> Nat .
+
+    var N : Nat .
+    var Q : Queue{Nat} .
+
+    eq enqueue (N, Q) = N : Q .
+    eq dequeue (Q : N) = Q .
+    eq firstFrom (Q : N) = N .
+    eq lastFrom(N : Q) = N .
+    eq lenght (N : Q) = 1 + lenght(Q) .
+    eq lenght (nil) = 0 .
+endfm
+
