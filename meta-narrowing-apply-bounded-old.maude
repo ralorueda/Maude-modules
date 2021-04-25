@@ -1,0 +1,72 @@
+mod NARROWING-VENDING-MACHINE is
+   sorts Coin Item Marking Money State .
+   subsort Coin < Money .
+   op empty : -> Money .
+   op __ : Money Money -> Money [assoc comm id: empty] .
+   subsort Money Item < Marking .
+   op __ : Marking Marking -> Marking [assoc comm id: empty] .
+   op <_> : Marking -> State .
+   ops $ q : -> Coin .
+   ops coffee tea water : -> Item .
+   var M : Marking .
+   rl [buy-coffee] : < M $ > => < M coffee > [narrowing] .
+   rl [buy-tea] : < M $ > => < M tea q > [narrowing] .
+   rl [buy-water] : < M $ > => < M water q q > [narrowing] .
+   eq [change] : q q q q M = $ M [variant] .
+endm
+
+
+fmod META-NARROWING-APPLY-BOUNDED is
+    protecting META-LEVEL .
+
+    sorts Node .
+    subsort Nat < Node .
+
+    sorts NarrowingApplyResultSet NarrowingApplyResultStructure State .
+    subsort NarrowingApplyResultStructure < NarrowingApplyResultSet .
+    
+    var M : Module .   var T : Term .   var TList : TermList .   var Q : Qid .   var N : Nat .
+    var Nod : Node .   vars MaxDepth MaxSol : Bound .   vars NARS1 NARS2 : NarrowingApplyResultSet .
+
+    op initNode : -> Node .
+    op _._ : Node Node -> Node [assoc id: initNode] .
+    op depth : Node -> Nat .
+    
+    eq depth(initNode) = 0 .
+    eq depth(Nod . N) = depth(Nod) + 1 .
+
+    op metaNarrowingApplyBounded : Module Term TermList Qid Bound Bound -> State .
+    op metaNarrowingApplyUnfold : Module Term TermList Qid Node -> NarrowingApplyResultSet .
+    op nil : -> NarrowingApplyResultSet [ctor] .
+    op _;_ : NarrowingApplyResultSet NarrowingApplyResultSet -> NarrowingApplyResultSet [assoc id: nil] .
+    op {_,_} : Node NarrowingApplyResult -> NarrowingApplyResultStructure .
+    op _||_||_ : NarrowingApplyResultSet Bound Bound ->  State .
+
+    eq metaNarrowingApplyBounded(M, T, TList, Q, 0, 0) = nil || 0 || 0 .
+    eq metaNarrowingApplyBounded(M, T, TList, Q, MaxDepth, MaxSol)
+       = metaNarrowingApplyUnfold(M, T, TList, Q, 0) || MaxDepth || MaxSol [owise] . 
+
+    ceq NARS1 ; metaNarrowingApplyUnfold(M, T, TList, Q, Nod . N) ; NARS2 || unbounded || s(MaxSol)
+        = NARS1 ; {(Nod . N), metaNarrowingApply(M, T, TList, Q, N)} ; metaNarrowingApplyUnfold(M, T, TList, Q, Nod . (N + 1)) ; NARS2 ;
+        metaNarrowingApplyUnfold(M, getTerm(metaNarrowingApply(M, T, TList, Q, N)), TList, Q, Nod . N . 0) || unbounded || sd(s(MaxSol),1) 
+    if metaNarrowingApply(M, T, TList, Q, N) =/= failure .
+
+    ceq NARS1 ; metaNarrowingApplyUnfold(M, T, TList, Q, Nod . N) ; NARS2 || MaxDepth || unbounded
+        = NARS1 ; {(Nod . N), metaNarrowingApply(M, T, TList, Q, N)} ; metaNarrowingApplyUnfold(M, T, TList, Q, Nod . (N + 1)) ; NARS2 ;
+        metaNarrowingApplyUnfold(M, getTerm(metaNarrowingApply(M, T, TList, Q, N)), TList, Q, Nod . N . 0) || MaxDepth || unbounded
+    if metaNarrowingApply(M, T, TList, Q, N) =/= failure and depth(Nod . N) < MaxDepth + 1 .
+
+    ceq NARS1 ; metaNarrowingApplyUnfold(M, T, TList, Q, Nod . N) ; NARS2 || MaxDepth || s(MaxSol)
+        = NARS1 ; {(Nod . N), metaNarrowingApply(M, T, TList, Q, N)} ; metaNarrowingApplyUnfold(M, T, TList, Q, Nod . (N + 1)) ; NARS2 ;
+        metaNarrowingApplyUnfold(M, getTerm(metaNarrowingApply(M, T, TList, Q, N)), TList, Q, Nod . N . 0) || MaxDepth || sd(s(MaxSol),1)
+    if metaNarrowingApply(M, T, TList, Q, N) =/= failure and depth(Nod . N) < MaxDepth + 1 .
+
+    eq NARS1 ; metaNarrowingApplyUnfold(M, T, TList, Q, Nod . N) ; NARS2 || MaxDepth || MaxSol = NARS1 ; NARS2 || MaxDepth || MaxSol [owise] .
+    
+endfm
+
+
+reduce in META-NARROWING-APPLY-BOUNDED :
+ metaNarrowingApplyBounded(upModule('NARROWING-VENDING-MACHINE, false),
+              '<_>['M:Money], empty, '@, 3, 50) .
+
