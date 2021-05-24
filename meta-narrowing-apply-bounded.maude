@@ -23,9 +23,9 @@ fmod META-NARROWING-APPLY-BOUNDED is
     subsort Nat < Node .
 
     sorts NarrowingApplyResultList NarrowingApplyResultStructure State .
-    subsort  NarrowingApplyResultStructure < NarrowingApplyResultList < State . 
-    
-    var M : Module .   var T : Term .   var TList : TermList .   var Q1 Q2 : Qid .   var N : Nat .
+    subsort NarrowingApplyResultStructure < NarrowingApplyResultList < State . 
+
+    var M : Module .   vars T1 T2 : Term .   var TList : TermList .   var Q1 Q2 Q3 : Qid .   var N : Nat .
     var Ty : Type .   var C : Context .   vars S1 S2 : Substitution .   var NAR : NarrowingApplyResult .
     var Nod : Node .   vars MaxDepth MaxSol : Bound .   vars NARS1 NARS2 : NarrowingApplyResultList .
 
@@ -37,45 +37,50 @@ fmod META-NARROWING-APPLY-BOUNDED is
     eq depth(Nod . N) = depth(Nod) + 1 .
 
     op metaNarrowingApplyBounded : Module Term TermList Qid Bound Bound -> State .
-    op metaNarrowingApplyUnfold : Module Term TermList Qid Node -> NarrowingApplyResultList .
     op nil : -> NarrowingApplyResultList [ctor] .
     op _;_ : NarrowingApplyResultList NarrowingApplyResultList -> NarrowingApplyResultList [assoc id: nil] .
-    op {_,_} : Node NarrowingApplyResult -> NarrowingApplyResultStructure .
+    op {_,_,_,_} : Node  Term Qid NarrowingApplyResult -> NarrowingApplyResultStructure .
     op (_,_,_,_,_,_) : Module TermList NarrowingApplyResultList NarrowingApplyResultList Bound Bound ->  State .
 
-    eq metaNarrowingApplyBounded(M, T, TList, Q1, 0, MaxSol:NzNat) = nil .
-    eq metaNarrowingApplyBounded(M, T, TList, Q1, MaxDepth:NzNat, 0) = nil .
-    eq metaNarrowingApplyBounded(M, T, TList, Q1, MaxDepth:NzNat, MaxSol:NzNat)
-       = (M, TList, nil, {0, metaNarrowingApply(M, T, TList, Q1, 0)}, MaxDepth:NzNat, MaxSol:NzNat) . 
+
+
+    eq metaNarrowingApplyBounded(M, T2, TList, Q1, 0, MaxSol) = nil .
+    eq metaNarrowingApplyBounded(M, T2, TList, Q1, MaxDepth, 0) = nil .
+    eq metaNarrowingApplyBounded(M, T2, TList, Q1, MaxDepth, MaxSol) =
+        (M, TList, nil, {0, T2, Q1, metaNarrowingApply(M, T2, TList, Q1, 0)}, MaxDepth, MaxSol) [owise] .
     
-
-    eq (M, TList, NARS1, nil, MaxDepth, MaxSol:NzNat) = NARS1 .
     eq (M, TList, NARS1, NARS2, MaxDepth, 0) = NARS1 .
-    eq (M, TList, NARS1, {Nod . N, failure} ; NARS2, MaxDepth, MaxSol:NzNat) = (M, TList, NARS1, NARS2, MaxDepth, MaxSol:NzNat) .
+    eq (M, TList, NARS1, nil, MaxDepth, MaxSol) = NARS1 .
+    eq (M, TList, NARS1, {Nod . N, T1, Q1, failure} ; NARS2, MaxDepth, MaxSol) = (M, TList, NARS1, NARS2, MaxDepth, MaxSol) .
 
-    eq (M, TList, NARS1, {Nod . N, {T, Ty, C, Q1, S1, S2, Q2}} ; NARS2, unbounded, unbounded)
-        = (M, TList, NARS1 ; {Nod . N, {T, Ty, C, Q1, S1, S2, Q2}}, {Nod . N + 1, metaNarrowingApply(M, T, TList, Q2, N + 1)} ; NARS2 ;
-          {Nod . N . 0, metaNarrowingApply(M, getTerm({T, Ty, C, Q1, S1, S2, Q2}), TList, Q2, 0)}, unbounded, unbounded) .
+    eq (M, TList, NARS1, {Nod . N, T1, Q3, {T2, Ty, C, Q1, S1, S2, Q2}} ; NARS2, unbounded, unbounded)
+        = (M, TList, NARS1 ; {Nod . N, T1, Q3, {T2, Ty, C, Q1, S1, S2, Q2}}, {Nod . N + 1, T1, Q3, metaNarrowingApply(M, T1, TList, Q3, N + 1)} ; NARS2 ;
+          {Nod . N . 0, T2, Q2, metaNarrowingApply(M, T2, TList, Q2, 0)}, unbounded, unbounded) .
 
-    eq (M, TList, NARS1, {Nod . N, {T, Ty, C, Q1, S1, S2, Q2}} ; NARS2, unbounded, MaxSol:Nat)
-        = (M, TList, NARS1 ; {Nod . N, {T, Ty, C, Q1, S1, S2, Q2}}, {Nod . N + 1, metaNarrowingApply(M, T, TList, Q2, N + 1)} ; NARS2 ;
-          {Nod . N . 0, metaNarrowingApply(M, getTerm({T, Ty, C, Q1, S1, S2, Q2}), TList, Q2, 0)}, unbounded, sd(MaxSol:Nat,1)) .
+    eq (M, TList, NARS1, {Nod . N, T1, Q3, {T2, Ty, C, Q1, S1, S2, Q2}} ; NARS2, unbounded, MaxSol:NzNat)
+        = (M, TList, NARS1 ; {Nod . N, T1, Q3, {T2, Ty, C, Q1, S1, S2, Q2}}, {Nod . N + 1, T1, Q3, metaNarrowingApply(M,  T1, TList, Q3, N + 1)} ; NARS2 ;
+          {Nod . N . 0, T2, Q2, metaNarrowingApply(M, T2, TList, Q2, 0)}, unbounded, sd(MaxSol:NzNat,1)) .
 
-    eq (M, TList, NARS1, {Nod . N, {T, Ty, C, Q1, S1, S2, Q2}} ; NARS2, MaxDepth:Nat, unbounded)
-        = if depth(Nod . N) <= MaxDepth:Nat then
-                  (M, TList, NARS1 ; {Nod . N, {T, Ty, C, Q1, S1, S2, Q2}}, {Nod . N + 1, metaNarrowingApply(M, T, TList, Q2, N + 1)} ; NARS2 ;
-                  {Nod . N . 0, metaNarrowingApply(M, getTerm({T, Ty, C, Q1, S1, S2, Q2}), TList, Q2, 0)}, MaxDepth:Nat, unbounded) 
+    eq (M, TList, NARS1, {Nod . N, T1, Q3, {T2, Ty, C, Q1, S1, S2, Q2}} ; NARS2, MaxDepth:NzNat, unbounded)
+        = if depth(Nod . N) <= MaxDepth:NzNat then
+                  (M, TList, NARS1 ; {Nod . N, T1, Q3, {T2, Ty, C, Q1, S1, S2, Q2}}, {Nod . N + 1, T1, Q3, metaNarrowingApply(M,  T1, TList, Q3, N + 1)} ; NARS2 ;
+                  {Nod . N . 0, T2, Q2, metaNarrowingApply(M, T2, TList, Q2, 0)}, MaxDepth:NzNat, unbounded) 
           else NARS1 fi .
 
-    eq (M, TList, NARS1, {Nod . N, {T, Ty, C, Q1, S1, S2, Q2}} ; NARS2, MaxDepth:Nat, MaxSol:Nat)
-        = if depth(Nod . N) <= MaxDepth:Nat then
-                  (M, TList, NARS1 ; {Nod . N, {T, Ty, C, Q1, S1, S2, Q2}}, {Nod . N + 1, metaNarrowingApply(M, T, TList, Q2, N + 1)} ; NARS2 ;
-                  {Nod . N . 0, metaNarrowingApply(M, getTerm({T, Ty, C, Q1, S1, S2, Q2}), TList, Q2, 0)}, MaxDepth:Nat, sd(MaxSol:Nat,1)) 
+    eq (M, TList, NARS1, {Nod . N, T1, Q3, {T2, Ty, C, Q1, S1, S2, Q2}} ; NARS2, MaxDepth:NzNat, MaxSol:NzNat)
+        = if depth(Nod . N) <= MaxDepth:NzNat then
+                  (M, TList, NARS1 ; {Nod . N, T1, Q3, {T2, Ty, C, Q1, S1, S2, Q2}}, {Nod . N + 1, T1, Q3, metaNarrowingApply(M,  T1, TList, Q3, N + 1)} ; NARS2 ;
+                  {Nod . N . 0, T2, Q2, metaNarrowingApply(M, T2, TList, Q2, 0)}, MaxDepth:NzNat, sd(MaxSol:NzNat,1)) 
           else NARS1 fi .
 
 endfm
 
+set show advisories on .
+
 reduce in META-NARROWING-APPLY-BOUNDED :
  metaNarrowingApplyBounded(upModule('NARROWING-VENDING-MACHINE, false),
-              '<_>['M:Money], empty, '@, 4, 15) .
+              '<_>['@1:Money], empty, '@, 3, unbounded) .
 
+
+--- Qid, String (Transormar Qid a String y viceversa)
+--- ... <<<
