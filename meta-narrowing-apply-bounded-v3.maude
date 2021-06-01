@@ -64,14 +64,14 @@ fmod META-NARROWING-APPLY-BOUNDED is
         unbounded, sd(MaxSol:NzNat,1)) . 
 
     eq (M, TList, T1, N1, NARS1, {N2, {T2, Ty1, C1, Q1, S1, S2, Q2}, N3, 0, Q3, N8} ; NARS2, MaxDepth:NzNat, unbounded)
-        = if N8 <= MaxDepth:NzNat + 1 then
+        = if N8 <= MaxDepth:NzNat then
             (M, TList, T1, N1 + 2, NARS1 ; {N2, {T2, Ty1, C1, Q1, S1, S2, Q2}, N3, 0, Q3, N8}, {N1, metaNarrowingApply(M, T1, TList, Q3, N3 + 1), N3 + 1, 0, Q3, N8} ; 
             NARS2 ; {N1 + 1, metaNarrowingApply(M, T2, TList, Q2, 0), 0, N2, Q2, N8 + 1}, MaxDepth:NzNat, unbounded)
         else NARS1 fi .
 
     eq (M, TList, T1, N1, NARS1 ; {N2:NzNat, {T2, Ty1, C1, Q1, S1, S2, Q2}, N3, N4, Q3, N5} ; NARS2, 
         {N6, {T3, Ty2, C2, Q4, S3, S4, Q5}, N7, N2:NzNat, Q6, N8} ; NARS3, MaxDepth:NzNat, unbounded)
-        = if N8 <= MaxDepth:NzNat + 1 then
+        = if N8 <= MaxDepth:NzNat then
             (M, TList, T1, N1 + 2, NARS1 ; {N2:NzNat, {T2, Ty1, C1, Q1, S1, S2, Q2}, N3, N4, Q3, N5} ; NARS2 ; {N6, {T3, Ty2, C2, Q4, S3, S4, Q5}, N7, N2:NzNat, Q6, N8}, 
             {N1, metaNarrowingApply(M, T2, TList, Q6, N7 + 1), N7 + 1, N2:NzNat, Q6, N8} ; NARS3 ; {N1 + 1, metaNarrowingApply(M, T3, TList, Q5, 0), 0, N6, Q5, N8 + 1}, 
             MaxDepth:NzNat, unbounded)
@@ -97,7 +97,7 @@ set show advisories on .
 
 reduce in META-NARROWING-APPLY-BOUNDED :
  metaNarrowingApplyBounded(upModule('NARROWING-VENDING-MACHINE, false),
-              '<_>['@1:Money], empty, '@, 3, 20) .
+              '<_>['@1:Money], empty, '@, unbounded, 3) .
 
 
 --- Qid, String (Transormar Qid a String y viceversa)
