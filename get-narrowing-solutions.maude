@@ -1,0 +1,206 @@
+fmod CONVERT-VARIABLES is
+    protecting META-LEVEL .
+    protecting CONVERSION .
+
+    var F : Qid .   var V : Variable .   var GT : GroundTerm .   var GNTL : NeGroundTermList .   var NTL : NeTermList .
+    var T : Term .   var N : Nat .   vars TL TL' TL'' : TermList .   vars SB SB' : Substitution .
+
+    op rename : TermList Nat -> Substitution .
+    eq rename(empty,N) = none .
+    eq rename((TL,V,TL',V,TL''),N) = rename((TL,V,TL',TL''),N) .
+    eq rename((V,TL),N) = V <- qid("$" + string(N,10) + ":" +
+    string(getType(V))) ; rename(TL,N + 1) [owise] .
+
+    op getVars : Term -> TermList .
+    eq getVars(GT) = empty .
+    eq getVars(V) = V .
+    eq getVars(F[NTL]) = getVars(NTL) [owise] .
+
+    op getVars : TermList -> TermList .
+    eq getVars(empty) = empty .
+    eq getVars((T,GNTL)) = getVars(T) .
+    eq getVars((T,NTL)) = (getVars(T),getVars(NTL)) [owise] .
+
+    op getRangeVars : Substitution -> TermList .
+    eq getRangeVars((none).Substitution) = empty .
+    eq getRangeVars(((V <- T) ; SB)) = (getVars(T),getRangeVars(SB)) .
+
+    op getVarsNumber : TermList -> Nat .
+    eq getVarsNumber(empty) = 0 .
+    eq getVarsNumber((T,TL)) = 1 + getVarsNumber(TL) .
+
+    op applySub : TermList Substitution -> TermList .
+    eq applySub(V,(V <- T) ; SB) = T .
+    eq applySub(F[TL], SB) = F[applySub(TL, SB)] .
+    eq applySub((T,NTL),SB) = (applySub(T,SB), applySub(NTL,SB)) .
+    eq applySub(T,SB) = T [owise] .
+
+    op applySub : Substitution Substitution -> Substitution .
+    eq applySub((none).Substitution,SB) = none .
+    eq applySub(V <- T ; SB,SB') =  V <- applySub(T,SB') ; applySub(SB,SB') .
+endfm
+
+
+fmod GET-NARROWING-SOLUTIONS is
+    protecting CONVERT-VARIABLES .
+
+    sorts NarrowingApplyResultStructure NarrowingApplyResultList State .
+    subsort NarrowingApplyResultStructure < NarrowingApplyResultList < State . 
+
+    sorts NarrowingResultStructure NarrowingResultList NarrowingState .
+    subsort UnificationPair? < NarrowingResultStructure < NarrowingResultList < NarrowingState .
+
+    var M : Module .   vars T1 T2 T3 T4 T5 T6 : Term .   var TList : TermList .   vars Q1 Q2 Q3 Q4 Q5 Q6 SearchQid : Qid .  var UP : UnificationPair .
+    vars N1 N2 N3 N4 N5 N6 N7 N8 N9 N10 : Nat .   vars Ty1 Ty2 : Type .   vars C1 C2 : Context .   vars S1 S2 S3 S4 S5 S6 : Substitution .   
+    vars MaxDepth MaxSol : Bound .   vars NARS1 NARS2 NARS3 NARS4 : NarrowingApplyResultList .   vars V1 V2 : Variable . vars NRS1 NRS2 : NarrowingResultList .
+
+    op getNarrowingSolutions : Module Term Qid Term TermList Qid Bound Bound -> NarrowingResultList  .
+    op {_,_,_,_} : Nat Term Substitution Substitution -> NarrowingResultStructure .
+    op calculateCumulativeSub : Nat Term Substitution Substitution -> NarrowingResultStructure .
+    op (_,_,_,_,_) : Term Term Bound NarrowingResultList State -> NarrowingState .
+    op noSolution : -> NarrowingResultList [ctor] .
+    op _;_ : NarrowingResultList NarrowingResultList -> NarrowingResultList [assoc id: noSolution] .
+    op reduceSub : Module Substitution -> Substitution .
+    op iterativeMetaVariantUnify : Module UnificationProblem TermList Nat Nat -> NarrowingResultList .
+
+    eq getNarrowingSolutions(M, T1, SearchQid, T2, TList, Q1, 0, MaxSol) = noSolution .
+    eq getNarrowingSolutions(M, T1, SearchQid, T2, TList, Q1, MaxDepth, 0) = noSolution .
+
+    --- =>1 generates only the first level, =>* and =>+ generate the MaxDepth indicated 
+    eq getNarrowingSolutions(M, T1, SearchQid, T2, TList, Q1, MaxDepth, MaxSol) = 
+        if SearchQid == '1 then
+            (T1, '1, T2, MaxSol, noSolution, getReachabilityTree(M, T1, TList, Q1, 1)) 
+        else  
+            (T1, '*, T2, MaxSol, noSolution, getReachabilityTree(M, T1, TList, Q1, MaxDepth)) 
+        fi [owise] .
+
+    --- Return solution list or noSolutions when the process is finished
+    eq  (T1, SearchQid, T2, MaxSol, NRS1, NARS1) = NRS1 .
+    eq  (T1, SearchQid, T2, MaxSol, noSolution, NARS1) = noSolution .
+
+    --- Try to unify target term with node term for (if MaxSol is not reached, and considering =>*)
+    eq  (T1, '*, T2, 0, NRS1, (M, T3, TList, N1, NARS1, NARS2, MaxDepth, N9, 1)) = (T1, '*, T2, 0, NRS1, NARS1) .
+    eq  (T1, '*, T2, MaxSol, NRS1, (M, T3, TList, N1, NARS1 ; {N2, {T4, Ty1, C1, Q1, S1, S2, Q2}, N3, N4, Q3, N5}, NARS2, MaxDepth, N9, 1)) 
+        = (T1, '*, T2, MaxSol, NRS1 ; iterativeMetaVariantUnify(M, T2 =? T4, TList, 0, 0), 
+        (M, T3, TList, N1, NARS1 ; {N2, {T4, Ty1, C1, Q1, S1, S2, Q2}, N3, N4, Q3, N5}, NARS2, MaxDepth, N9, 2)) [owise] .
+
+    --- Try to unify target term with node term for (if MaxSol is not reached, and considering =>1)
+    eq  (T1, '1, T2, 0, NRS1, (M, T3, TList, N1, NARS1, NARS2, MaxDepth, N9, 1)) = (T1, '1, T2, 0, NRS1, NARS1) .
+    eq  (T1, '1, T2, MaxSol, NRS1, (M, T3, TList, N1, NARS1 ; {N2, {T4, Ty1, C1, Q1, S1, S2, Q2}, N3, N4, Q3, N5}, NARS2, MaxDepth, N9, 1)) 
+        = (T1, '1, T2, MaxSol, NRS1 ; iterativeMetaVariantUnify(M, T2 =? T4, TList, 0, 0), 
+        (M, T3, TList, N1, NARS1 ; {N2, {T4, Ty1, C1, Q1, S1, S2, Q2}, N3, N4, Q3, N5}, NARS2, MaxDepth, N9, 2)) [owise] .
+
+    --- Try to unify target term with node term for (if MaxSol is not reached, and considering =>+)
+    eq  (T1, '+, T2, 0, NRS1, (M, T3, TList, N1, NARS1, NARS2, MaxDepth, N9, 1)) = (T1, '+, T2, 0, NRS1, NARS1) .
+    eq  (T1, '+, T2, MaxSol, NRS1, (M, T3, TList, N1, NARS1 ; {N2, {T4, Ty1, C1, Q1, S1, S2, Q2}, N3, N4, Q3, N5}, NARS2, MaxDepth, N9, 1)) 
+        = if N3 > 1 then
+            (T1, '+, T2, MaxSol, NRS1 ; iterativeMetaVariantUnify(M, T2 =? T4, TList, 0, 0), 
+            (M, T3, TList, N1, NARS1 ; {N2, {T4, Ty1, C1, Q1, S1, S2, Q2}, N3, N4, Q3, N5}, NARS2, MaxDepth, N9, 2))
+          else
+            (T1, '+, T2, MaxSol, NRS1, (M, T3, TList, N1, NARS1 ; {N2, {T4, Ty1, C1, Q1, S1, S2, Q2}, N3, N4, Q3, N5}, NARS2, MaxDepth, N9, 0)) 
+          fi [owise] .
+    
+    --- Iterate using metaVariantUnify to find all unifiers (if any)
+    eq iterativeMetaVariantUnify(M, T1 =? T2, TList, N1, 0) 
+        = metaVariantUnify(M, T1 =? T2, TList, N1, 0) ; iterativeMetaVariantUnify(M, T1 =? T2, TList, N1, 1) .
+    eq {S1, N2} ; iterativeMetaVariantUnify(M, T1 =? T2, TList, N1, N2:NzNat)
+        = {S1, N2} ; metaVariantUnify(M, T1 =? T2, TList, N1, N2:NzNat) ; iterativeMetaVariantUnify(M, T1 =? T2, TList, N1, N2:NzNat + 1) .
+    eq NRS1 ; noUnifier ; iterativeMetaVariantUnify(M, T1 =? T2, TList, N1, 1)
+        = NRS1 ; noUnifier .
+    eq NRS1 ; noUnifier ; iterativeMetaVariantUnify(M, T1 =? T2, TList, N1, N2:NzNat)
+        = NRS1 .
+
+    --- If it is not possible to unify, there is no solution using the term in current node
+    eq  (T1, SearchQid, T2, MaxSol, NRS1 ; noUnifier, (M, T3, TList, N1, NARS1, NARS2, MaxDepth, N9, 2))
+        = (T1, SearchQid, T2, MaxSol, NRS1, (M, T3, TList, N1, NARS1, NARS2, MaxDepth, N9, 0)) .
+
+    --- If it is possible to unify, there are one or more solutions  
+    eq  (T1, SearchQid, T2, unbounded, NRS1 ; {S5, N10} ; NRS2, (M, T3, TList, N1, NARS1 ; {N2, {T4, Ty1, C1, Q1, S1, S2, Q2}, N3, N4, Q3, N5}, NARS2, MaxDepth, N9, 2))
+        = (T1, SearchQid, T2, unbounded, NRS1 ; calculateCumulativeSub(N2, T4, S1, S5) ; NRS2, (M, T3, TList, N1, NARS1 ; 
+          {N2, {T4, Ty1, C1, Q1, S1, S2, Q2}, N3, N4, Q3, N5}, NARS2, MaxDepth, N9, 2)) .
+
+    eq  (T1, SearchQid, T2, MaxSol, NRS1 ; {S5, N10} ; NRS2, (M, T3, TList, N1, NARS1 ; {N2, {T4, Ty1, C1, Q1, S1, S2, Q2}, N3, N4, Q3, N5}, NARS2, MaxDepth, N9, 2))
+        = (T1, SearchQid, T2, sd(MaxSol, 1), NRS1 ; calculateCumulativeSub(N2, T4, S1, S5) ; NRS2, (M, T3, TList, N1, NARS1 ; 
+          {N2, {T4, Ty1, C1, Q1, S1, S2, Q2}, N3, N4, Q3, N5}, NARS2, MaxDepth, N9, 2)) [owise] .
+    
+    --- Calculate cumulative substitutions
+    --- Level 1 (Include substitutions reduction to normal form)
+    eq (T1, SearchQid, T2, MaxSol, NRS1 ; calculateCumulativeSub(N6, T6, S5, S6) ; NRS2, (M, T3, TList, N1, NARS1 ; 
+        {N2:NzNat, {T4, Ty1, C1, Q1, S1, S2, Q2}, N3, 0, Q3, N5} ; NARS2 ; {N6, {T5, Ty2, C2, Q4, S3, S4, Q5}, N7, N2:NzNat, Q6, N4} ; 
+        NARS3, NARS4, MaxDepth, N9, 2))
+        = (T1, SearchQid, T2, MaxSol, NRS1 ; {N6, T6, reduceSub(M, applySub(S1, S5)), reduceSub(M, S6)} ; NRS2, (M, T3, TList, N1, NARS1 ; 
+        {N2:NzNat, {T4, Ty1, C1, Q1, S1, S2, Q2}, N3, 0, Q3, N5} ; NARS2 ; {N6, {T5, Ty2, C2, Q4, S3, S4, Q5}, N7, N2:NzNat, Q6, N4} ; 
+        NARS3, NARS4, MaxDepth, N9, 2)) .
+    --- Level >1
+    eq (T1, SearchQid, T2, MaxSol, NRS1 ; calculateCumulativeSub(N6, T6, S5, S6) ; NRS2, (M, T3, TList, N1, NARS1 ; 
+        {N2:NzNat, {T4, Ty1, C1, Q1, S1, S2, Q2}, N3, N4:NzNat, Q3, N5} ; NARS2 ; {N6, {T5, Ty2, C2, Q4, S3, S4, Q5}, N7, N2:NzNat, Q6, N8} ; 
+        NARS3, NARS4, MaxDepth, N9, 2))
+        = (T1, SearchQid, T2, MaxSol, NRS1 ; calculateCumulativeSub(N2:NzNat, T6, applySub(S1, S5), S6) ; NRS2, (M, T3, TList, N1, NARS1 ; 
+        {N2:NzNat, {T4, Ty1, C1, Q1, S1, S2, Q2}, N3, N4:NzNat, Q3, N5} ; NARS2 ; {N6, {T5, Ty2, C2, Q4, S3, S4, Q5}, N7, N2:NzNat, Q6, N8} ; 
+        NARS3, NARS4, MaxDepth, N9, 2)) .
+    --- When all the solutions for the current node have been computed, move on to the next step
+    eq  (T1, SearchQid, T2, MaxSol, NRS1 ; {N6, T6, S5, S6} ; NRS2, (M, T3, TList, N1, NARS1, NARS2, MaxDepth, N9, 2))
+        = (T1, SearchQid, T2, unbounded, NRS1 ; {N6, T6, S5, S6} ; NRS2, (M, T3, TList, N1, NARS1, NARS2, MaxDepth, N9, 0)) [owise] .
+        
+    --- Normalize substitutions
+    eq reduceSub(M, (none).Substitution) = (none).Substitution .
+    eq reduceSub(M, V1 <- T1 ; S1) = V1 <- getTerm(metaReduce(M, T1)) ; reduceSub(M, S1) .
+    
+    
+    -----------------------------------------------------------------------------------
+    ----------------------- GENERATION OF THE REACHABILITY TREE------------------------ 
+    -----------------------------------------------------------------------------------
+
+    op getReachabilityTree : Module Term TermList Qid Bound -> State .
+    op nil : -> NarrowingApplyResultList [ctor] .
+    op _;_ : NarrowingApplyResultList NarrowingApplyResultList -> NarrowingApplyResultList [assoc id: nil] .
+    --- NarrowingApplyResultStructure : Node NarrowingApplyResult Sub-branch ParentNode Qid NodeDepth
+    op {_,_,_,_,_,_} : Nat NarrowingApplyResult Nat Nat Qid Nat -> NarrowingApplyResultStructure .
+    --- State : Module InitTerm TermList NodeCounter ProcessedResults ResultsToProcess MaxDepth VariableCounter ProcessStep
+    op (_,_,_,_,_,_,_,_,_) : Module Term TermList Nat NarrowingApplyResultList NarrowingApplyResultList Bound Nat Nat ->  State .
+
+    eq getReachabilityTree(M, T1, TList, Q1, 0) = nil .
+    eq getReachabilityTree(M, T1, TList, Q1, MaxDepth) =
+        (M, T1, TList, 2, nil, {1, metaNarrowingApply(M, T1, TList, Q1, 0), 0, 0, Q1, 1}, MaxDepth, 1, 0) [owise] .
+    
+    eq (M, T1, TList, N1, NARS1, nil, MaxDepth, N9, 0) = NARS1 .
+    eq (M, T1, TList, N1, NARS1, {N2, failure, N3, N4, Q1, N5} ; NARS2, MaxDepth, N9, 1) = (M, T1, TList, N1, NARS1, NARS2, MaxDepth, N9, 1) .
+
+    --- Depth 1 (The value of the MaxDepth parameter does not matter here)
+    eq (M, T1, TList, N1, NARS1, {N2, {T2, Ty1, C1, Q1, S1, S2, Q2}, N3, 0, Q3, 1} ; NARS2, MaxDepth, N9, 0)
+        = (M, T1, TList, N1 + 2, NARS1 ; {N2, {applySub(T2,rename((getVars(T2),getRangeVars(S1),getRangeVars(S2)),N9)), Ty1, C1, Q1, 
+        applySub(S1,rename((getVars(T2),getRangeVars(S1),getRangeVars(S2)),N9)), applySub(S2,rename((getVars(T2),getRangeVars(S1),getRangeVars(S2)),N9)), '$},
+        N3, 0, Q3, 1}, {N1, metaNarrowingApply(M, T1, TList, Q3, N3 + 1), N3 + 1, 0, Q3, 1} ; NARS2 ;
+        {N1 + 1, metaNarrowingApply(M, applySub(T2,rename((getVars(T2),getRangeVars(S1),getRangeVars(S2)),N9)), TList, Q2, 0), 0, N2, Q2, 2}, 
+        MaxDepth, N9 + getVarsNumber((getVars(T2),getRangeVars(S1),getRangeVars(S2))), 1) .
+
+    --- MaxDepth unbounded: Depth >1
+    eq (M, T1, TList, N1, NARS1 ; {N2:NzNat, {T2, Ty1, C1, Q1, S1, S2, Q2}, N3, N4, Q3, N5} ; NARS2, 
+        {N6, {T3, Ty2, C2, Q4, S3, S4, Q5}, N7, N2:NzNat, Q6, N8} ; NARS3, unbounded, N9, 0)
+        = (M, T1, TList, N1 + 2, NARS1 ; {N2:NzNat, {T2, Ty1, C1, Q1, S1, S2, Q2}, N3, N4, Q3, N5} ; NARS2 ; 
+        {N6, {applySub(T3,rename((getVars(T3),getRangeVars(S3),getRangeVars(S4)),N9)), Ty2, C2, Q4, 
+        applySub(S3,rename((getVars(T3),getRangeVars(S3),getRangeVars(S4)),N9)), applySub(S4,rename((getVars(T3),getRangeVars(S3),getRangeVars(S4)),N9)), '$}, 
+        N7, N2:NzNat, '$, N8}, {N1, metaNarrowingApply(M, T2, TList, Q6, N7 + 1), N7 + 1, N2:NzNat, Q6, N8} ; NARS3 ; {N1 + 1, 
+        metaNarrowingApply(M, applySub(T3,rename((getVars(T3),getRangeVars(S3),getRangeVars(S4)),N9)), TList, Q5, 0), 0, N6, Q5, N8 + 1}, 
+        unbounded, N9 + getVarsNumber((getVars(T3),getRangeVars(S3),getRangeVars(S4))), 1) .
+
+    --- MaxDepth bounded: Depth >1
+    eq (M, T1, TList, N1, NARS1 ; {N2:NzNat, {T2, Ty1, C1, Q1, S1, S2, Q2}, N3, N4, Q3, N5} ; NARS2, 
+        {N6, {T3, Ty2, C2, Q4, S3, S4, Q5}, N7, N2:NzNat, Q6, N8} ; NARS3, MaxDepth:NzNat, N9, 0)
+        = if N8 <= MaxDepth:NzNat then
+            (M, T1, TList, N1 + 2, NARS1 ; {N2:NzNat, {T2, Ty1, C1, Q1, S1, S2, Q2}, N3, N4, Q3, N5} ; NARS2 ; 
+            {N6, {applySub(T3,rename((getVars(T3),getRangeVars(S3),getRangeVars(S4)),N9)), Ty2, C2, Q4, 
+            applySub(S3,rename((getVars(T3),getRangeVars(S3),getRangeVars(S4)),N9)), applySub(S4,rename((getVars(T3),getRangeVars(S3),getRangeVars(S4)),N9)), '$},
+            N7, N2:NzNat, '$, N8}, {N1, metaNarrowingApply(M, T2, TList, Q6, N7 + 1), N7 + 1, N2:NzNat, Q6, N8} ; NARS3 ; {N1 + 1, 
+            metaNarrowingApply(M, applySub(T3,rename((getVars(T3),getRangeVars(S3),getRangeVars(S4)),N9)), TList, Q5, 0), 0, N6, Q5, N8 + 1}, 
+            MaxDepth:NzNat, N9 + getVarsNumber((getVars(T3),getRangeVars(S3),getRangeVars(S4))), 1)
+        else NARS1 ; {N2:NzNat, {T2, Ty1, C1, Q1, S1, S2, Q2}, N3, N4, Q3, N5} ; NARS2 fi .
+
+endfm
+
+
+set show advisories on .
+
+reduce in GET-NARROWING-SOLUTIONS :
+    getNarrowingSolutions(upModule('NARROWING-VENDING-MACHINE, false),
+                            '<_>['M:Money], '+, '<_>['__['M:Money,'__['a.Item,'c.Item]]], empty, '@, 3, unbounded) .

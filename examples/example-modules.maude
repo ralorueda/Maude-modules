@@ -1,0 +1,33 @@
+mod NARROWING-VENDING-MACHINE is
+   sorts Coin Item Marking Money State .
+   subsort Coin < Money .
+   op empty : -> Money .
+   op __ : Money Money -> Money [assoc comm id: empty] .
+   subsort Money Item < Marking .
+   op __ : Marking Marking -> Marking [assoc comm id: empty] .
+   op <_> : Marking -> State .
+   ops $ q : -> Coin .
+   ops c a : -> Item .
+   var M : Marking .
+   rl [buy-c] : < M $ > => < M c > [narrowing] .
+   rl [buy-a] : < M $ > => < M a q > [narrowing] .
+   eq [change] : q q q q M = $ M [variant] .
+endm
+
+mod SUCC-PRED is
+   sorts Int State .
+  
+   op 0 : -> Int [ctor] .
+   ops s p : Int -> Int .
+   op _+_ : Int Int -> Int [assoc comm prec 30] .
+   op <_,_> : Int Int -> State [ctor] .
+
+   vars X Y : Int .
+  
+   eq [E1] : X + 0 = X [variant] .
+   eq [E2] : X + s(Y) = s(X + Y) [variant] .
+   eq [E3] : X + p(Y) = p(X + Y) [variant] .
+   eq [E4] : p(s(X))= X [variant] .
+   eq [E5] : s(p(X)) = X [variant] .
+   rl [r1] : < s(X),Y > => < p(s(X)),s(Y) > [narrowing] .
+endm

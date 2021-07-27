@@ -1,0 +1,114 @@
+fmod CONVERT-VARIABLES is
+    protecting META-LEVEL .
+    protecting CONVERSION .
+
+    var F : Qid .   var V : Variable .   var GT : GroundTerm .   var GNTL : NeGroundTermList .   var NTL : NeTermList .
+    var T : Term .   var N : Nat .   vars TL TL' TL'' : TermList .   vars SB SB' : Substitution .
+
+    op rename : TermList Nat -> Substitution .
+    eq rename(empty,N) = none .
+    eq rename((TL,V,TL',V,TL''),N) = rename((TL,V,TL',TL''),N) .
+    eq rename((V,TL),N) = V <- qid("$" + string(N,10) + ":" +
+    string(getType(V))) ; rename(TL,N + 1) [owise] .
+
+    op getVars : Term -> TermList .
+    eq getVars(GT) = empty .
+    eq getVars(V) = V .
+    eq getVars(F[NTL]) = getVars(NTL) [owise] .
+
+    op getVars : TermList -> TermList .
+    eq getVars(empty) = empty .
+    eq getVars((T,GNTL)) = getVars(T) .
+    eq getVars((T,NTL)) = (getVars(T),getVars(NTL)) [owise] .
+
+    op getRangeVars : Substitution -> TermList .
+    eq getRangeVars((none).Substitution) = empty .
+    eq getRangeVars(((V <- T) ; SB)) = (getVars(T),getRangeVars(SB)) .
+
+    op getVarsNumber : Term -> Nat .
+    eq getVarsNumber(GT) = 0 .
+    eq getVarsNumber(V) = 1 .
+    eq getVarsNumber(F[NTL]) = getVarsNumber(NTL) [owise] .
+
+    op getVarsNumber : TermList -> Nat .
+    eq getVarsNumber((T,GNTL)) = getVarsNumber(T) .
+    eq getVarsNumber((T,NTL)) = getVarsNumber(T) + getVarsNumber(NTL) [owise] .
+
+    op applySub : TermList Substitution -> TermList .
+    eq applySub(V,(V <- T) ; SB) = T .
+    eq applySub(F[TL], SB) = F[applySub(TL, SB)] .
+    eq applySub((T,NTL),SB) = (applySub(T,SB), applySub(NTL,SB)) .
+    eq applySub(T,SB) = T [owise] .
+
+    op applySub : Substitution Substitution -> Substitution .
+    eq applySub((none).Substitution,SB) = none .
+    eq applySub(V <- T ; SB,SB') =  V <- applySub(T,SB') ; applySub(SB,SB') .
+endfm
+
+
+fmod GET-REACHABILITY-TREE is
+    protecting CONVERT-VARIABLES .
+
+    sorts NarrowingApplyResultList NarrowingApplyResultStructure State .
+    subsort NarrowingApplyResultStructure < NarrowingApplyResultList < State . 
+
+    var M : Module .   vars T1 T2 T3 T4 : Term .   var TList : TermList .   vars Q1 Q2 Q3 Q4 Q5 Q6 : Qid .   vars N1 N2 N3 N4 N5 N6 N7 N8 N9 : Nat .
+    vars Ty1 Ty2 : Type .   vars C1 C2 : Context .   vars S1 S2 S3 S4 : Substitution .   vars MaxDepth : Bound .   
+    vars NARS1 NARS2 NARS3 : NarrowingApplyResultList .
+
+    op getReachabilityTree : Module Term TermList Qid Bound -> State .
+    op nil : -> NarrowingApplyResultList [ctor] .
+    op _;_ : NarrowingApplyResultList NarrowingApplyResultList -> NarrowingApplyResultList [assoc id: nil] .
+    --- NarrowingApplyResultStructure : Node NarrowingApplyResult Sub-branch ParentNode Qid NodeDepth
+    op {_,_,_,_,_,_} : Nat NarrowingApplyResult Nat Nat Qid Nat -> NarrowingApplyResultStructure .
+    --- State : Module InitTerm TermList NodeCounter ProcessedResults ResultsToProcess MaxDepth VariableCounter
+    op (_,_,_,_,_,_,_,_) : Module Term TermList Nat NarrowingApplyResultList NarrowingApplyResultList Bound Nat ->  State .
+
+    eq getReachabilityTree(M, T1, TList, Q1, 0) = nil .
+    eq getReachabilityTree(M, T1, TList, Q1, MaxDepth) =
+        (M, T1, TList, 2, nil, {1, metaNarrowingApply(M, T1, TList, Q1, 0), 0, 0, Q1, 1}, MaxDepth, 1) [owise] .
+    
+    eq (M, T1, TList, N1, NARS1, nil, MaxDepth, N9) = NARS1 .
+    eq (M, T1, TList, N1, NARS1, {N2, failure, N3, N4, Q1, N5} ; NARS2, MaxDepth, N9) = (M, T1, TList, N1, NARS1, NARS2, MaxDepth, N9) .
+
+    --- Depth 1 (The value of the MaxDepth parameter does not matter here)
+    eq (M, T1, TList, N1, NARS1, {N2, {T2, Ty1, C1, Q1, S1, S2, Q2}, N3, 0, Q3, 1} ; NARS2, MaxDepth, N9)
+        = (M, T1, TList, N1 + 2, NARS1 ; {N2, {applySub(T2,rename((getVars(T2),getRangeVars(S1),getRangeVars(S2)),N9)), Ty1, C1, Q1, 
+        applySub(S1,rename((getVars(T2),getRangeVars(S1),getRangeVars(S2)),N9)), applySub(S2,rename((getVars(T2),getRangeVars(S1),getRangeVars(S2)),N9)), '$},
+        N3, 0, Q3, 1}, {N1, metaNarrowingApply(M, T1, TList, Q3, N3 + 1), N3 + 1, 0, Q3, 1} ; NARS2 ;
+        {N1 + 1, metaNarrowingApply(M, applySub(T2,rename((getVars(T2),getRangeVars(S1),getRangeVars(S2)),N9)), TList, Q2, 0), 0, N2, Q2, 2}, 
+        MaxDepth, N9 + getVarsNumber((getVars(T2),getRangeVars(S1),getRangeVars(S2)))) .
+
+    --- MaxDepth unbounded: Depth >1
+    eq (M, T1, TList, N1, NARS1 ; {N2:NzNat, {T2, Ty1, C1, Q1, S1, S2, Q2}, N3, N4, Q3, N5} ; NARS2, 
+        {N6, {T3, Ty2, C2, Q4, S3, S4, Q5}, N7, N2:NzNat, Q6, N8} ; NARS3, unbounded, N9)
+        = (M, T1, TList, N1 + 2, NARS1 ; {N2:NzNat, {T2, Ty1, C1, Q1, S1, S2, Q2}, N3, N4, Q3, N5} ; NARS2 ; 
+        {N6, {applySub(T3,rename((getVars(T3),getRangeVars(S3),getRangeVars(S4)),N9)), Ty2, C2, Q4, 
+        applySub(S3,rename((getVars(T3),getRangeVars(S3),getRangeVars(S4)),N9)), applySub(S4,rename((getVars(T3),getRangeVars(S3),getRangeVars(S4)),N9)), '$}, 
+        N7, N2:NzNat, '$, N8}, {N1, metaNarrowingApply(M, T2, TList, Q6, N7 + 1), N7 + 1, N2:NzNat, Q6, N8} ; NARS3 ; {N1 + 1, 
+        metaNarrowingApply(M, applySub(T3,rename((getVars(T3),getRangeVars(S3),getRangeVars(S4)),N9)), TList, Q5, 0), 0, N6, Q5, N8 + 1}, 
+        unbounded, N9 + getVarsNumber((getVars(T3),getRangeVars(S3),getRangeVars(S4)))) .
+
+
+    --- MaxDepth bounded: Depth >1
+    eq (M, T1, TList, N1, NARS1 ; {N2:NzNat, {T2, Ty1, C1, Q1, S1, S2, Q2}, N3, N4, Q3, N5} ; NARS2, 
+        {N6, {T3, Ty2, C2, Q4, S3, S4, Q5}, N7, N2:NzNat, Q6, N8} ; NARS3, MaxDepth:NzNat, N9)
+        = if N8 <= MaxDepth:NzNat then
+            (M, T1, TList, N1 + 2, NARS1 ; {N2:NzNat, {T2, Ty1, C1, Q1, S1, S2, Q2}, N3, N4, Q3, N5} ; NARS2 ; 
+            {N6, {applySub(T3,rename((getVars(T3),getRangeVars(S3),getRangeVars(S4)),N9)), Ty2, C2, Q4, 
+            applySub(S3,rename((getVars(T3),getRangeVars(S3),getRangeVars(S4)),N9)), applySub(S4,rename((getVars(T3),getRangeVars(S3),getRangeVars(S4)),N9)), '$},
+            N7, N2:NzNat, '$, N8}, {N1, metaNarrowingApply(M, T2, TList, Q6, N7 + 1), N7 + 1, N2:NzNat, Q6, N8} ; NARS3 ; {N1 + 1, 
+            metaNarrowingApply(M, applySub(T3,rename((getVars(T3),getRangeVars(S3),getRangeVars(S4)),N9)), TList, Q5, 0), 0, N6, Q5, N8 + 1}, 
+            MaxDepth:NzNat, N9 + getVarsNumber((getVars(T3),getRangeVars(S3),getRangeVars(S4))))
+        else NARS1 ; {N2:NzNat, {T2, Ty1, C1, Q1, S1, S2, Q2}, N3, N4, Q3, N5} ; NARS2 fi .
+
+endfm
+
+
+set show advisories on .
+
+reduce in GET-REACHABILITY-TREE :
+ getReachabilityTree(upModule('SUCC-PRED, false),
+              '<_`,_>['0.Int,'s['Z:Int]], empty, '@, 3) .
+--- Qid, String (Transormar Qid a String y viceversa)
+--- ... <<<
